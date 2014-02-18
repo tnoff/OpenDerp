@@ -1,3 +1,7 @@
 OpenDerp
 ====
 Random openstack scripts
+
+*Make Source : make a source.sh file with given username, tenant name and auth-url
+
+*Openstack dev : with username, password, tenant_name, auth_url; open a python session with all clients
