@@ -52,22 +52,28 @@ class ImageConvert(object):
                 relevant_images.append(i)
         return relevant_images
 
-    def convert_image(self, image):
+    def convert_image(self, image, delete=False):
         print 'Converting image:', image.id
         size_gb = math.ceil(image.size / ( 1024 * 1024 * 1024.0))
         print '--creating volume'
         volume = self.cinder.volumes.create(size_gb, imageRef=image.id)
-        self.wait_for_condition(self.cinder.volumes.get, volume.id, ['available'], ['error'])
+        result = self.wait_for_condition(self.cinder.volumes.get, volume.id, ['available'], ['error'])
+        if result is None:
+            print 'error creating volume, exiting'
+            return
         print '--volume:%s created' % volume.id
 
         print '--creating new image'
         new_image = self.cinder.volumes.upload_to_image(volume.id, True,  image.name + '-updated', 'bare', 'qcow2')
         image_id = new_image[1]['os-volume_upload_image']['image_id']
-        self.wait_for_condition(self.glance.images.get, image_id, ['active'], ['error'])
+        result = self.wait_for_condition(self.glance.images.get, image_id, ['active'], ['error'])
+        if result is None:
+            print 'error creating image, exiting'
+            return
         print '--image:%s created' % image_id
 
         print '--deleting created volume'
-        self.wait_for_condition(self.cinder.volumes.get, volume.id, ['available'], ['ERROR'])
+        self.wait_for_condition(self.cinder.volumes.get, volume.id, ['available'], ['error'])
         self.cinder.volumes.delete(volume.id)
         
         print '--updating new image'
@@ -78,20 +84,21 @@ class ImageConvert(object):
         self.glance.images.update(image_id, **image_args)
 
         print '--deleting original image'
-        self.glance.images.delete(image)
+        if delete:
+            self.glance.images.delete(image)
         
         new_size = self.glance.images.get(image_id).size / ( 1024 * 1024 * 1024.0)
         return size_gb - new_size
 
-    def shrink_image(self, image_id):
+    def shrink_image(self, image_id, delete=False):
         image = self.glance.images.get(image_id)
-        saved = self.convert_image(image)
+        saved = self.convert_image(image, delete=delete)
         print 'Program has freed up %s GB' % str(saved)
 
-    def shrink_all_images(self):
+    def shrink_all_images(self, delete=False):
         total_saved = 0
         for image in self.image_list():
-            total_saved += self.convert_image(image)
+            total_saved += self.convert_image(image, delete=delete)
         print 'Program has freed up %s GB' % str(total_saved)
 
 def parse_args():
@@ -101,13 +108,14 @@ def parse_args():
     a.add_argument('tenant_name', help='Auth tenant name')
     a.add_argument('auth_url', help='Auth url')
     a.add_argument('image_id', help='Id of image to convert, "all" to convert all possible raw images')
+    a.add_argument('--delete', action='store_true', help='Delete old images')
     return a.parse_args()
 def main():
-    args = parse_args()
-    i = ImageConvert(args.username, args.password, args.tenant_name, args.auth_url)
-    if args.image_id == 'all':
-        i.shrink_all_images()
+    args = vars(parse_args())
+    i = ImageConvert(args['username'], args['password'], args['tenant_name'], args['auth_url'])
+    if args['image_id'] == 'all':
+        i.shrink_all_images(delete=args['delete'])
     else:
-        i.shrink_image(args.image_id)
+        i.shrink_image(args['image_id'], delete=args['delete'])
 if __name__ == '__main__':
     main()
