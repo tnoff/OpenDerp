@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 from cinderclient.v1 import client as cinder_v1
+from datetime import datetime
 from glanceclient import Client as glance_client
 import json
 from keystoneclient.v2_0 import client as key_v2
@@ -238,6 +239,45 @@ def snapshot_server(args):
         with open(args['download'], 'w+') as f:
             for d in glance.images.data(image_id, do_checksum=False):
                 f.write(d)
+    return image_id
+
+def _find_oldest_backup(glance, instance_id):
+    backup_num = 0
+    oldest_image = None
+    oldest_time = None
+    for im in glance.images.list():
+        try:
+            if im.properties['backup_instance_uuid'] == instance_id:
+                backup_num += 1
+                if oldest_time == None:
+                    oldest_image = im.id
+                    oldest_time = im.properties['backup_timestamp']
+                elif im.properties['backup_timestamp'] < oldest_time:
+                    oldest_image = im.id
+                    oldest_time = im.properties['backup_timestamp']
+        except KeyError:
+            continue
+    return oldest_image, backup_num
+
+def backup(args):
+    args['image_name'] = args['instance-id'] + '-' + str(datetime.utcnow())
+    args['download'] = None
+    image_id = snapshot_server(args)
+    glance = _get_glance_client(args['os_username'], args['os_password'],
+                                args['os_tenant_name'], args['os_auth_url'])
+    image = glance.images.get(image_id)
+    properties = image.properties
+    properties['backup_instance_uuid'] = args['instance-id']
+    properties['backup_timestamp'] = time.time()
+    log.info("Updating image:%s to have backup info" % image_id)
+    glance.images.update(image_id, properties=properties)
+    while True:
+        oldest_image, backup_num = _find_oldest_backup(glance,
+                                                       args['instance-id'])
+        if backup_num <= args['backups']:
+            break
+        log.info("Deleting oldest image:%s" % oldest_image)
+        glance.images.delete(oldest_image)
 
 def parse_args():
     a = argparse.ArgumentParser(
@@ -266,6 +306,12 @@ def parse_args():
     snapshot.add_argument('--image-name', help='Name of new image')
     snapshot.add_argument('--download', help='Download new image')
 
+    back = subparser.add_parser('backup', help='Backup an instance')
+    back.add_argument('instance-id', help='ID of instance to backup')
+    back.add_argument('--backups', type=int, default=5,
+                      help='Number of backups to keep')
+
+
     return a.parse_args()
 
 def get_env_args(args):
@@ -287,5 +333,7 @@ def main():
         boot_server(args)
     if args['command'] == 'snapshot':
         snapshot_server(args)
+    if args['command'] == 'backup':
+        backup(args)
 if __name__ == '__main__':
     main()
