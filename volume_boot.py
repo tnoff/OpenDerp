@@ -142,14 +142,15 @@ def _boot_server(glance, cinder, nova,
         sys.exit('Your volume cant boot, exiting :(')
     log.info('Volume avaialable:%s, booting server' % vol.id)
     if server_name == None:
-        name = _random_string(prefix='server-')
+        server_name = _random_string(prefix='server-')
     block_mapping = {'vda' : '%s:::0' % str(vol.id)}
-    nic = []
-    for net in networks:
-        nic.append({'net-id' : net})
-    if nic == []:
+    if networks != None:
+        nic = []
+        for net in networks:
+            nic.append({'net-id' : net})
+    else:
         nic = None
-    server = nova.servers.create(name, image_id, flavor_id,
+    server = nova.servers.create(server_name, image_id, flavor_id,
                                  block_device_mapping=block_mapping, nics=nic)
     log.info('Server:%s created, waiting' % server.id)
     result = _wait_for_condition(nova.servers.get, server.id,
