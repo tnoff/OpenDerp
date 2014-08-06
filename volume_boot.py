@@ -13,7 +13,6 @@ import string
 import sys
 import time
 
-tiny_flavor = 1
 logging_format = '%(asctime)s--%(levelname)s--%(message)s'
 logging.basicConfig(format=logging_format, level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -63,11 +62,15 @@ def _get_glance_client(username, password, tenant_name, auth_url):
             glance_ip = endpoint['endpoints'][0]['publicURL']
     return glance_client('1', endpoint=glance_ip, token=token)
 
-def _create_keypair_image(nova, glance, image_id, key_name):
+def _create_keypair_image(nova, glance, image_id, key_name, dummy_flavor):
+    # OpenStack does not support key injection on instances booted from volume
+    # To workaround this, create a dummy instance with the keypair
+    # Snapshot this instance, and then create a volume from that snapshot
+    # The snapshot will contain the injected key
     server_name = _random_string(prefix='dummy-')
     log.info('Creating dummy server')
     server = nova.servers.create(server_name, image_id,
-                                 tiny_flavor, key_name=key_name)
+                                 dummy_flavor, key_name=key_name)
     log.info('Server created:%s' % server.id)
     log.info('Waiting for server:%s' % server.id)
     result = _wait_for_condition(nova.servers.get, server.id,
@@ -93,6 +96,9 @@ def _create_keypair_image(nova, glance, image_id, key_name):
     return image
 
 def _shrink_image(cinder, nova, glance, image):
+    # To shrink an image, create a volume from that image
+    # then create a qcow2 image from that volume
+    # The cinder backend will do a 'qemu-img convert' to shrink the image
     real_size = image.size / (1024*1024*1024.0)
     log.info('Image:%s not large enough, shrinking' % image.id)
     vol = cinder.volumes.create(real_size + 1, imageRef=image.id)
@@ -121,9 +127,11 @@ def _shrink_image(cinder, nova, glance, image):
     cinder.volumes.delete(vol.id)
     return image
 
-def _boot_server(glance, cinder, nova,
-                 image_id, flavor_id, vol_size, server_name,
-                 volume_type, networks):
+def _launch_server(glance, cinder, nova,
+                   image_id, flavor_id, vol_size, server_name,
+                   volume_type, networks):
+    # You cannot create a bootable volume that is smaller than the image
+    # So check if you need to shrink the image
     image = glance.images.get(image_id)
     real_size = image.size /(1024*1024*1024.0)
     if vol_size < real_size:
@@ -132,6 +140,8 @@ def _boot_server(glance, cinder, nova,
         if vol_size < real_size:
             sys.exit('Your volume size isnt big enough, need:%s GB' % real_size)
         image_id = image.id
+
+    # Once size is ok, create the bootable volume
     log.info('Creating bootable volume')
     vol = cinder.volumes.create(vol_size, imageRef=image_id,
                                 volume_type=volume_type)
@@ -140,16 +150,18 @@ def _boot_server(glance, cinder, nova,
                                  ['available'], ['error'])
     if result == None:
         sys.exit('Your volume cant boot, exiting :(')
+
+    # Then boot the server
     log.info('Volume avaialable:%s, booting server' % vol.id)
     if server_name == None:
         server_name = _random_string(prefix='server-')
     block_mapping = {'vda' : '%s:::0' % str(vol.id)}
-    if networks != None:
+    # Check networks
+    nic = None
+    if networks:
         nic = []
         for net in networks:
             nic.append({'net-id' : net})
-    else:
-        nic = None
     server = nova.servers.create(server_name, image_id, flavor_id,
                                  block_device_mapping=block_mapping, nics=nic)
     log.info('Server:%s created, waiting' % server.id)
@@ -171,14 +183,15 @@ def boot_server(args):
     delete_image = False
     if args['key_name'] != None:
         image = _create_keypair_image(nova, glance, args['image-id'],
-                                      args['key_name'])
+                                      args['key_name'], args['dummy_flavor'])
         args['image-id'] = image.id
-        delete_image = True
-        if args['keep_image']:
-            delete_image = False
-    _boot_server(glance, cinder, nova, args['image-id'], args['flavor-id'],
-                 args['vol-size'], args['name'], args['volume_type'],
-                 args['networks'])
+        # You can keep the keypair injected image if you choose
+        # Delete by default
+        if not args['keep_image']:
+            delete_image = True
+    _launch_server(glance, cinder, nova, args['image-id'], args['flavor-id'],
+                   args['vol-size'], args['name'], args['volume_type'],
+                   args['networks'])
     if delete_image:
         glance.images.delete(args['image-id'])
 
@@ -189,12 +202,16 @@ def snapshot_server(args):
                               args['os_tenant_name'], args['os_auth_url'])
     nova = nova_v1.Client(args['os_username'], args['os_password'],
                           args['os_tenant_name'], args['os_auth_url'])
+    # When you create a snapshot from a volume, it returns an image
+    # This image is useless, it only points you to a volume snapshot
+    # Use this volume snapshot to create a save image
     dummy_image_name = _random_string(prefix='dummy-')
     log.info('Snapshotting server:%s' % args['instance-id'])
     image_id = nova.servers.create_image(args['instance-id'], dummy_image_name)
     image = glance.images.get(image_id)
     log.info('Created useless image:%s' % image_id)
     mappings = json.loads(image.properties['block_device_mapping'])
+    # Find the volume snapshot in the image metadata
     volume_snap = None
     for m in mappings:
         if m['instance_uuid'] == args['instance-id']:
@@ -205,12 +222,14 @@ def snapshot_server(args):
     log.info('Volume snapshot found, deleting useless image')
     glance.images.delete(image_id)
     log.info('Volume snapshot:%s' % volume_snap)
+    # Make sure volume snapshot is useable
     volume_snapshot = cinder.volume_snapshots.get(volume_snap)
     result = _wait_for_condition(cinder.volume_snapshots.get, volume_snap,
                                  ['available'], ['error'])
     if result is None:
         log.error('Error creating volume snapshot')
         sys.exit()
+    # Create a volume from that snasphot
     vol = cinder.volumes.create(volume_snapshot.size,
                                 snapshot_id=volume_snap)
     log.info('Created volume:%s, waiting' % vol.id)
@@ -221,6 +240,7 @@ def snapshot_server(args):
         sys.exit()
     if args['image_name'] == None:
         args['image_name'] = 'Snapshot of instance:%s' % args['instance-id']
+    # Create a image from that volume
     im = cinder.volumes.upload_to_image(vol.id, True,
                                         args['image_name'], 'bare', 'qcow2')
     image_id = im[1]['os-volume_upload_image']['image_id']
@@ -230,6 +250,7 @@ def snapshot_server(args):
     if result is None:
         log.error('Error creating image:%s' % image_id)
         sys.exit()
+    # Delete all the things once the image is made
     cinder.volumes.delete(vol.id)
     result = _wait_for_deletion(cinder.volumes.list, vol.id, ['error'])
     if result is None:
@@ -261,6 +282,7 @@ def _find_oldest_backup(glance, instance_id):
     return oldest_image, backup_num
 
 def backup(args):
+    # Snapshot a server, and keep a certain number of backups in glance
     args['image_name'] = args['instance-id'] + '-' + str(datetime.utcnow())
     args['download'] = None
     image_id = snapshot_server(args)
@@ -268,10 +290,12 @@ def backup(args):
                                 args['os_tenant_name'], args['os_auth_url'])
     image = glance.images.get(image_id)
     properties = image.properties
+    # Set metadata to make image easier to find
     properties['backup_instance_uuid'] = args['instance-id']
     properties['backup_timestamp'] = time.time()
     log.info("Updating image:%s to have backup info" % image_id)
     glance.images.update(image_id, properties=properties)
+    # Check if any old backups need deletion
     while True:
         oldest_image, backup_num = _find_oldest_backup(glance,
                                                        args['instance-id'])
@@ -301,6 +325,10 @@ def parse_args():
     boot.add_argument('--volume-type', default='ceph', help='Volume type')
     boot.add_argument('--networks', nargs='+',
                       help='Network IDs to add to instance')
+    # This should be the smallest flavor possible
+    # You want an instance booted from this flavor to launch very quickly
+    boot.add_argument('--dummy-flavor', default='1',
+                      help='Flavor to launch dummy instances with')
 
     snapshot = subparser.add_parser('snapshot', help='Snapshot an instance')
     snapshot.add_argument('instance-id', help='ID of instance to snapshot')
@@ -316,14 +344,11 @@ def parse_args():
     return a.parse_args()
 
 def get_env_args(args):
-    if args['os_username'] == None and 'OS_USERNAME' in os.environ.keys():
-        args['os_username'] = os.environ['OS_USERNAME']
-    if args['os_password'] == None and 'OS_PASSWORD' in os.environ.keys():
-        args['os_password'] = os.environ['OS_PASSWORD']
-    if args['os_tenant_name'] == None and 'OS_TENANT_NAME' in os.environ.keys():
-        args['os_tenant_name'] = os.environ['OS_TENANT_NAME']
-    if args['os_auth_url'] == None and 'OS_AUTH_URL' in os.environ.keys():
-        args['os_auth_url'] = os.environ['OS_AUTH_URL']
+    # Check environment for variables if not set on command line
+    args['os_username'] = args['os_username'] or os.getenv('OS_USERNAME', None)
+    args['os_password'] = args['os_password'] or os.getenv('OS_PASSWORD', None)
+    args['os_tenant_name'] = args['os_tenant_name'] or os.getenv('OS_TENANT_NAME', None)
+    args['os_auth_url'] = args['os_auth_url'] or os.getenv('OS_AUTH_URL', None)
     return args
 
 
@@ -336,5 +361,6 @@ def main():
         snapshot_server(args)
     if args['command'] == 'backup':
         backup(args)
+
 if __name__ == '__main__':
     main()
