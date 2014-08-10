@@ -5,6 +5,7 @@ from keystoneclient.v2_0 import client as key_v2
 import logging
 import math
 import os
+import sys
 import time
 
 DEFAULT_TIMEOUT = 3600
@@ -124,14 +125,19 @@ def parse_args():
     return a.parse_args()
 
 def get_env(args):
-    pairs = {'username' : 'OS_USERNAME',
-             'password' : 'OS_PASSWORD',
-             'tenant_name' : 'OS_TENANT_NAME',
-             'auth_url' : 'OS_AUTH_URL'
-            }
-    for k, v in pairs.iteritems():
-        if args[k] == None and v in os.environ.keys():
-            args[k] = os.environ[v]
+    if not args['username']:
+        args['username'] = os.getenv('OS_USERNAME', None)
+    if not args['password']:
+        args['password'] = os.getenv('OS_PASSWORD', None)
+    if not args['tenant_name']:
+        args['tenant_name'] = os.getenv('OS_TENANT_NAME', None)
+    if not args['auth_url']:
+        args['auth_url'] = os.getenv('OS_AUTH_URL', None)
+    # Check for args
+    must_have = ['username', 'password', 'tenant_name', 'auth_url']
+    for item in must_have:
+        if args[item] == None:
+            sys.exit("Don't have:%s, exiting" % item)
     return args
 
 def main():
