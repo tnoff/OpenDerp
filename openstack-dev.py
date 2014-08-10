@@ -20,14 +20,15 @@ def parse_args():
     return a.parse_args()
 
 def get_env(args):
-    if args['username'] == None and 'OS_USERNAME' in os.environ.keys():
-        args['username'] = os.environ['OS_USERNAME']
-    if args['password'] == None and 'OS_PASSWORD' in os.environ.keys():
-        args['password'] = os.environ['OS_PASSWORD']
-    if args['tenant_name'] == None and 'OS_TENANT_NAME' in os.environ.keys():
-        args['tenant_name'] = os.environ['OS_TENANT_NAME']
-    if args['auth_url'] == None and 'OS_AUTH_URL' in os.environ.keys():
-        args['auth_url'] = os.environ['OS_AUTH_URL']
+    if not args['username']:
+        args['username'] = os.getenv('OS_USERNAME', None)
+    if not args['password']:
+        args['password'] = os.getenv('OS_PASSWORD', None)
+    if not args['tenant_name']:
+        args['tenant_name'] = os.getenv('OS_TENANT_NAME', None)
+    if not args['auth_url']:
+        args['auth_url'] = os.getenv('OS_AUTH_URL', None)
+    # Check for args
     must_have = ['username', 'password', 'tenant_name', 'auth_url']
     for item in must_have:
         if args[item] == None:
