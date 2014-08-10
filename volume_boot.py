@@ -345,12 +345,19 @@ def parse_args():
 
 def get_env_args(args):
     # Check environment for variables if not set on command line
-    args['os_username'] = args['os_username'] or os.getenv('OS_USERNAME', None)
-    args['os_password'] = args['os_password'] or os.getenv('OS_PASSWORD', None)
-    args['os_tenant_name'] = args['os_tenant_name'] or os.getenv('OS_TENANT_NAME', None)
-    args['os_auth_url'] = args['os_auth_url'] or os.getenv('OS_AUTH_URL', None)
+    if not args['username']:
+        args['username'] = os.getenv('OS_USERNAME', None)
+    if not args['password']:
+        args['password'] = os.getenv('OS_PASSWORD', None)
+    if not args['tenant_name']:
+        args['tenant_name'] = os.getenv('OS_TENANT_NAME', None)
+    if not args['auth_url']:
+        args['auth_url'] = os.getenv('OS_AUTH_URL', None)
+    must_have = ['username', 'password', 'tenant_name', 'auth_url']
+    for item in must_have:
+        if args[item] == None:
+            sys.exit("Don't have:%s, exiting" % item)
     return args
-
 
 def main():
     args = vars(parse_args())
