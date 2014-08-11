@@ -173,12 +173,12 @@ def _launch_server(glance, cinder, nova,
     log.info('Server ready:%s' % server.id)
 
 def boot_server(args):
-    glance = _get_glance_client(args['os_username'], args['os_password'],
-                                args['os_tenant_name'], args['os_auth_url'])
-    cinder = cinder_v1.Client(args['os_username'], args['os_password'],
-                              args['os_tenant_name'], args['os_auth_url'])
-    nova = nova_v1.Client(args['os_username'], args['os_password'],
-                          args['os_tenant_name'], args['os_auth_url'])
+    glance = _get_glance_client(args['username'], args['password'],
+                                args['tenant_name'], args['auth_url'])
+    cinder = cinder_v1.Client(args['username'], args['password'],
+                              args['tenant_name'], args['auth_url'])
+    nova = nova_v1.Client(args['username'], args['password'],
+                          args['tenant_name'], args['auth_url'])
 
     delete_image = False
     if args['key_name'] != None:
@@ -196,12 +196,12 @@ def boot_server(args):
         glance.images.delete(args['image-id'])
 
 def snapshot_server(args):
-    glance = _get_glance_client(args['os_username'], args['os_password'],
-                                args['os_tenant_name'], args['os_auth_url'])
-    cinder = cinder_v1.Client(args['os_username'], args['os_password'],
-                              args['os_tenant_name'], args['os_auth_url'])
-    nova = nova_v1.Client(args['os_username'], args['os_password'],
-                          args['os_tenant_name'], args['os_auth_url'])
+    glance = _get_glance_client(args['username'], args['password'],
+                                args['tenant_name'], args['auth_url'])
+    cinder = cinder_v1.Client(args['username'], args['password'],
+                              args['tenant_name'], args['auth_url'])
+    nova = nova_v1.Client(args['username'], args['password'],
+                          args['tenant_name'], args['auth_url'])
     # When you create a snapshot from a volume, it returns an image
     # This image is useless, it only points you to a volume snapshot
     # Use this volume snapshot to create a save image
@@ -286,8 +286,8 @@ def backup(args):
     args['image_name'] = args['instance-id'] + '-' + str(datetime.utcnow())
     args['download'] = None
     image_id = snapshot_server(args)
-    glance = _get_glance_client(args['os_username'], args['os_password'],
-                                args['os_tenant_name'], args['os_auth_url'])
+    glance = _get_glance_client(args['username'], args['password'],
+                                args['tenant_name'], args['auth_url'])
     image = glance.images.get(image_id)
     properties = image.properties
     # Set metadata to make image easier to find
@@ -307,10 +307,10 @@ def backup(args):
 def parse_args():
     a = argparse.ArgumentParser(
         description='Create a ceph backed instance from an image')
-    a.add_argument('--os-username', help='OpenStack Auth username')
-    a.add_argument('--os-password', help='OpenStack Auth password')
-    a.add_argument('--os-tenant-name', help='OpenStack Auth tenant name')
-    a.add_argument('--os-auth-url', help='OpenStack Auth keystone url')
+    a.add_argument('--username', help='OpenStack Auth username')
+    a.add_argument('--password', help='OpenStack Auth password')
+    a.add_argument('--tenant-name', help='OpenStack Auth tenant name')
+    a.add_argument('--auth-url', help='OpenStack Auth keystone url')
 
     subparser = a.add_subparsers(dest='command')
     boot = subparser.add_parser('boot', help='Boot a new instance')
