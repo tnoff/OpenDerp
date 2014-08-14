@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-from __init__ import CloudUsage
+from cloud_usage import CloudUsage
 import argparse
 import os
 from prettytable import PrettyTable
+import sys
 
 def parse_args():
     p = argparse.ArgumentParser(description='Create & Setup OpenStack Accounts')
