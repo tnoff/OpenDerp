@@ -36,5 +36,5 @@ Python Script
 
 .. code::
 
-    from cloud_usage import CloudUsage
-    help(CloudUsage)
+    >>> from cloud_usage import CloudUsage
+    >>> help(CloudUsage)
