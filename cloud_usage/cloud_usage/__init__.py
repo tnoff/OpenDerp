@@ -136,11 +136,15 @@ class CloudUsage(object):
                                                       tenant_name=tenant.name,
                                                       authurl=self.os_auth_url)
                 info = swift.head_account()
+                containers = int(info['x-account-container-count'])
+                bytes_used = int(info['x-account-bytes-used'])
+                if containers == 0 and bytes_used == 0:
+                    continue
                 swift_dict.setdefault(tenant.id, deepcopy(swift_default))
-                swift_dict[tenant.id]['containers'] +=  int(info['x-account-container-count'])
-                swift_dict[tenant.id]['bytes'] += int(info['x-account-bytes-used'])
-                swift_dict['total']['containers'] +=  int(info['x-account-container-count'])
-                swift_dict['total']['bytes'] += int(info['x-account-bytes-used'])
+                swift_dict[tenant.id]['containers'] += containers
+                swift_dict[tenant.id]['bytes'] += bytes_used
+                swift_dict['total']['containers'] += containers
+                swift_dict['total']['bytes'] += bytes_used
         return swift_dict
 
     def cloud_usage(self):
