@@ -1,9 +1,19 @@
 #!/usr/bin/env python
 
 import argparse
+import logging
 import os
 from shrink_image import ShrinkImage
 import sys
+
+log_format = '%(asctime)s-%(levelname)s-%(message)s'
+log = logging.getLogger('shrink_image')
+log.setLevel(logging.DEBUG)
+handle = logging.StreamHandler()
+handle.setLevel(logging.DEBUG)
+form = logging.Formatter(log_format)
+handle.setFormatter(form)
+log.addHandler(handle)
 
 def parse_args():
     p = argparse.ArgumentParser(description='Manage Boot From Volume Instances')
@@ -43,6 +53,7 @@ def main():
                     args['auth_url'])
     if args['all']:
         s.shrink_all_images()
+        return
     if args['image_id']:
         s.shrink_image(args['image_id'], image_name=args['name'])
 
