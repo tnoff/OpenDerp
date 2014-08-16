@@ -90,7 +90,7 @@ class VolumeBoot(object):
                                  ['available'], blacklist=['error'])
         return result
 
-    def __create_instance(self, flavor, image, name, volume,
+    def __create_instance(self, flavor, image, name, volume, key_name,
                           networks, security_groups):
         mapping = {'vda' : '%s:::1' % volume}
         if networks:
@@ -99,7 +99,8 @@ class VolumeBoot(object):
         server = self.nova.servers.create(name, image, flavor,
                                           block_device_mapping=mapping,
                                           nics=networks,
-                                          security_groups=security_groups)
+                                          security_groups=security_groups,
+                                          key_name=key_name)
         log.debug('Creating instance:%s' % server.id)
         result = self.__wait_for(server.id, self.nova.servers.get,
                                  ['ACTIVE'], blacklist=['ERROR'])
@@ -107,8 +108,8 @@ class VolumeBoot(object):
 
     def boot_from_volume(self, flavor, image, name, size, temp_flavor,
                          key_name=None, volume_type=None, networks=None,
-                         security_groups=None):
-        if key_name:
+                         security_groups=None, no_temp=False):
+        if key_name and no_temp == False:
             log.debug('Creating temporary instance for key injection')
             with self.__temp_image(temp_flavor, image, key_name) as injected_image:
                 if not injected_image:
@@ -117,7 +118,7 @@ class VolumeBoot(object):
                 volume = self.__create_bootable_volume(size, injected_image, volume_type)
         else:
             volume = self.__create_bootable_volume(size, image, volume_type)
-        return self.__create_instance(flavor, image, name, volume,
+        return self.__create_instance(flavor, image, name, volume, key_name,
                                       networks, security_groups)
 
     @contextmanager

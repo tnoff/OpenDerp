@@ -32,6 +32,8 @@ def parse_args():
     boot.add_argument('name', help='Name of new instance')
     boot.add_argument('size', type=int, help='Size of volume')
     boot.add_argument('--key-name', help='Name of keypair to use')
+    boot.add_argument('--no-temp', action='store_true',
+                      help='Do not use keypair injection workaround')
     boot.add_argument('--temp-flavor',
                       default='1',
                       help='Temp flavor to use for key injection')
@@ -73,7 +75,8 @@ def main():
                            key_name=args['key_name'],
                            volume_type=args['volume_type'],
                            networks=args['networks'],
-                           security_groups=args['security_groups'])
+                           security_groups=args['security_groups'],
+                           no_temp=args['no_temp'])
     if args['command'] == 'snapshot':
         v.snapshot_instance(args['instance'], image_name=args['name'])
 
