@@ -43,6 +43,20 @@ class VolumeBoot(object):
             obj = function(obj_id)
         return obj.id
 
+    def __wait_for_delete(self, obj_id, list_function, interval=5,
+                          timeout=3600):
+        expected_timeout = time.time() + timeout
+        obj_list = list_function()
+        while time.time() >= expected_timeout:
+            found = False
+            for obj in obj_list:
+                if obj.id == obj_id:
+                    found = True
+                    break
+            if found:
+                return True
+        return False
+
     @contextmanager
     def __temp_image(self, flavor, image, key_name):
         log.debug('Creating temp image for key injection')
@@ -131,14 +145,28 @@ class VolumeBoot(object):
         mappings = json.loads(image.properties['block_device_mapping'])
         all_snaps = []
         for mappin in mappings:
-            if mappin['device_name'] == 'vda':
-                snapshot = self.cinder.volume_snapshots.get(mappin['snapshot_id'])
-                log.debug('Found volume snapshot:%s' % mappin['snapshot_id'])
-                self.__wait_for(mappin['snapshot_id'],
-                                self.cinder.volume_snapshots.get,
-                                ['available'],
-                                blacklist=['error'])
             all_snaps.append(mappin['snapshot_id'])
+            try:
+                if mappin['device_name'] == 'vda':
+                    snapshot = self.cinder.volume_snapshots.get(mappin['snapshot_id'])
+                    log.debug('Found volume snapshot:%s' % mappin['snapshot_id'])
+                    self.__wait_for(mappin['snapshot_id'],
+                                    self.cinder.volume_snapshots.get,
+                                    ['available'],
+                                    blacklist=['error'])
+            except KeyError:
+                # Pre icehouse versions have different mappings
+                _snapshot = self.cinder.volume_snapshots.get(mappin['snapshot_id'])
+                _vol = self.cinder.volumes.get(_snapshot.volume_id)
+                for attach in _vol.attachments:
+                    if attach['device'] == 'vda' and instance_id == attach['server_id']:
+                        snapshot = self.cinder.volume_snapshots.get(mappin['snapshot_id'])
+                        log.debug('Found volume snapshot:%s' % snapshot.id)
+                        self.__wait_for(snapshot.id,
+                                        self.cinder.volume_snapshots.get,
+                                        ['available'],
+                                        blacklist=['error'])
+                        break
         log.debug('Creating volume from snapshot')
         vol = self.cinder.volumes.create(snapshot.size, snapshot_id=snapshot.id)
         log.debug('Created volume:%s' % vol.id)
@@ -149,13 +177,12 @@ class VolumeBoot(object):
         finally:
             log.debug('Deleting instance snapshot:%s' % snapshot_id)
             self.glance.images.delete(snapshot_id)
+            log.debug('Deleting created volume:%s' % vol.id)
+            self.cinder.volumes.delete(vol.id)
+            self.__wait_for_delete(vol.id, self.cinder.volumes.list)
             log.debug('Deleting volume snapshots:%s' % all_snaps)
             for snap in all_snaps:
                 self.cinder.volume_snapshots.delete(snap)
-            self.__wait_for(vol.id, self.cinder.volumes.get,
-                            ['available'], blacklist=['error'])
-            log.debug('Deleting created volume:%s' % vol.id)
-            self.cinder.volumes.delete(vol.id)
 
     def snapshot_instance(self, instance_id, image_name=None):
         with self.__temp_volume(instance_id) as volume:
