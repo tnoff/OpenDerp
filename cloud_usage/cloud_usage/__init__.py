@@ -19,7 +19,8 @@ class CloudUsage(object):
         self.keystone = key_v2.Client(username=username,
                                       password=password,
                                       tenant_name=tenant_name,
-                                      auth_url=auth_url)
+                                      auth_url=auth_url,
+                                      endpoint_type='adminURL')
         token = self.keystone.auth_token
         image_url = self.keystone.service_catalog.url_for(service_type='image')
         self.glance = glance_client('1', token=token, endpoint=image_url)
