@@ -5,10 +5,18 @@ Connect to OpenStack using the s3 python boto module
 
 Install
 -------
-- git clone https://github.com/tylernorth/s3-client.git
-- pip install s3-client/
 
-Use
----
-- s3-client --help
-- s3-client list # List all buckets/containers
+.. code::
+
+    $ git clone https://github.com/tylernorth/OpenDerp.git
+    $ cd OpenDerp
+    $ pip install s3-client/
+
+Command Use
+-------------
+
+.. code::
+
+    $ s3-client --help
+    # List all buckets/containers
+    $ s3-client list
