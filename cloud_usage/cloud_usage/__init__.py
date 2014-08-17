@@ -3,6 +3,8 @@ from contextlib import contextmanager
 from copy import deepcopy
 from glanceclient import Client as glance_client
 from keystoneclient.v2_0 import client as key_v2
+from keystoneclient.openstack.common.apiclient import exceptions as keystone_exceptions
+from neutronclient.v2_0 import client as neutron_v2
 from novaclient.v1_1 import client as nova_v1
 import random
 import string
@@ -21,6 +23,11 @@ class CloudUsage(object):
                                       tenant_name=tenant_name,
                                       auth_url=auth_url,
                                       endpoint_type='adminURL')
+        self.neutron = neutron_v2.Client(username=username,
+                                         password=password,
+                                         tenant_name=tenant_name,
+                                         auth_url=auth_url,
+                                         endpoint_type='adminURL')
         token = self.keystone.auth_token
         image_url = self.keystone.service_catalog.url_for(service_type='image')
         self.glance = glance_client('1', token=token, endpoint=image_url)
@@ -34,6 +41,12 @@ class CloudUsage(object):
         for role in self.keystone.roles.list():
             if '_member_' == role.name:
                 return role
+        return None
+
+    def __get_tenant(self, name):
+        for tenant in self.keystone.tenants.list():
+            if tenant.name == name:
+                return tenant
         return None
 
     @contextmanager
@@ -148,6 +161,25 @@ class CloudUsage(object):
                 swift_dict['total']['bytes'] += bytes_used
         return swift_dict
 
+    def neutron_usage(self):
+        usage = dict()
+        default = {'networks' : 0, 'shared_networks' : 0}
+        usage['total'] = deepcopy(default)
+        try:
+            networks = self.neutron.list_networks()['networks']
+        except keystone_exceptions.EndpointNotFound:
+            usage['total']['Endpoint'] = 'URL not found'
+            return usage
+        for net in networks:
+            tenant = self.__get_tenant(net['tenant_id'])
+            usage.setdefault(tenant.id, deepcopy(default))
+            usage[tenant.id]['networks'] += 1
+            usage['total']['networks'] += 1
+            if net['shared']:
+                usage[tenant.id]['shared_networks'] += 1
+                usage['total']['shared_networks'] += 1
+        return usage
+
     def cloud_usage(self):
         usage = dict()
         usage['cinder'] = self.cinder_usage()
@@ -155,4 +187,5 @@ class CloudUsage(object):
         usage['keystone'] = self.keystone_usage()
         usage['glance'] = self.glance_usage()
         usage['swift'] = self.swift_usage()
+        usage['neutron'] = self.neutron_usage()
         return usage

@@ -37,7 +37,7 @@ def main():
                    args['tenant_name'], args['auth_url'])
 
     data = c.cloud_usage()
-    show_keys = ['cinder', 'keystone', 'nova', 'swift', 'glance']
+    show_keys = ['cinder', 'keystone', 'nova', 'swift', 'glance', 'neutron']
     for key in show_keys:
         print 'Moudle:%s' % key
         raw_columns = data[key]['total'].keys()
