@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import setuptools
 
-VERSION = '1.1'
+VERSION = '2.0'
 
 setuptools.setup(
     author='Tyler Daniel North',
@@ -17,6 +17,6 @@ setuptools.setup(
         ]
     },
     packages=setuptools.find_packages(),
-    name='s3',
+    name='s3-client',
     version=VERSION,
 )
