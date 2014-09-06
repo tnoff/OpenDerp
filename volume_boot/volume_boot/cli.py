@@ -46,6 +46,11 @@ def parse_args():
     snapshot.add_argument('instance', help='ID of instance')
     snapshot.add_argument('--name', help='Image name')
 
+    backup = subparsers.add_parser('backup', help='Backup instance')
+    backup.add_argument('instance', help='ID of instance')
+    backup.add_argument('--max', default=0, type=int,
+                        help='Maximum number of backups')
+
     return p.parse_args()
 
 def get_env_args(args):
@@ -79,6 +84,8 @@ def main():
                            no_temp=args['no_temp'])
     if args['command'] == 'snapshot':
         v.snapshot_instance(args['instance'], image_name=args['name'])
+    if args['command'] == 'backup':
+        v.backup_instance(args['instance'], args['max'])
 
 if __name__ == '__main__':
     main()

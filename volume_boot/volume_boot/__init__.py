@@ -53,6 +53,7 @@ class VolumeBoot(object):
                 if obj.id == obj_id:
                     found = True
                     break
+            time.sleep(interval)
             if found:
                 return True
         return False
@@ -178,6 +179,8 @@ class VolumeBoot(object):
             log.debug('Deleting instance snapshot:%s' % snapshot_id)
             self.glance.images.delete(snapshot_id)
             log.debug('Deleting created volume:%s' % vol.id)
+            self.__wait_for(vol.id, self.cinder.volumes.get,
+                            ['available'], blacklist=['error'])
             self.cinder.volumes.delete(vol.id)
             self.__wait_for_delete(vol.id, self.cinder.volumes.list)
             log.debug('Deleting volume snapshots:%s' % all_snaps)
@@ -198,3 +201,45 @@ class VolumeBoot(object):
             log.debug('Created image:%s' % image_id)
             self.__wait_for(image_id, self.glance.images.get,
                             ['active'], blacklist=['error'])
+        return image_id
+
+    def __delete_old_backups(self, instance_id, max_backups):
+        log.debug('Deleting old backups, %s allowed' % max_backups)
+        backups = []
+        for image in self.glance.images.list():
+            try:
+                if instance_id == image.properties['backup_instance_id']:
+                    backups.append(image)
+            except KeyError:
+                continue
+        num_backups = len(backups)
+        log.debug('Found %s backups, %s are allowed' % (num_backups, max_backups))
+        if num_backups > max_backups:
+            log.debug('Deleting old backups:%s' % backups)
+            delete_amount = num_backups - max_backups
+            delete_backups = []
+            for backup in backups:
+                if len(delete_backups) < delete_amount:
+                    delete_backups.append(backup)
+                    continue
+                delete_index = None
+                for count, deleted in enumerate(delete_backups):
+                    if deleted.properties['backup_timestamp'] > backup.properties['backup_timestamp']:
+                        delete_index = count
+                        break
+                if delete_index:
+                    delete_backups[delete_index] = backup
+            for backup in delete_backups:
+                log.debug('Deleting backup:%s' % backup.id)
+                self.glance.images.delete(backup.id)
+
+    def backup_instance(self, instance_id, max_num):
+        # Check for number of backups
+        instance_name = self.nova.servers.get(instance_id).name
+        image_name = '%s-%s' % (instance_name, time.time())
+        backup_image = self.snapshot_instance(instance_id, image_name=image_name)
+        metadata = {'backup_instance_id' : instance_id, 'backup_timestamp' : time.time()}
+        log.debug('Updating image metadata:%s' % metadata)
+        self.glance.images.update(backup_image, properties=metadata)
+        if max_num:
+            self.__delete_old_backups(instance_id, max_num)

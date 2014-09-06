@@ -9,8 +9,7 @@ Installation
 .. code::
 
     git clone https://github.com/tylernorth/OpenDerp.git
-    cd OpenDerp/compute_scripts/
-    pip install volume_boot/
+    pip install OpenDerp/volume_boot/
 
 Command Line
 --------------
@@ -20,14 +19,16 @@ Command Line
     $ volume-boot --help
     usage: volume-boot [-h] [--username USERNAME] [--password PASSWORD]
                        [--tenant-name TENANT_NAME] [--auth-url AUTH_URL]
-                       {boot,snapshot} ...
+                       {boot,snapshot,backup} ...
 
     Manage Boot From Volume Instances
 
     positional arguments:
-      {boot,snapshot}       Sub-command
+      {boot,snapshot,backup}
+                            Sub-command
         boot                Create instance from bootable volume
         snapshot            Snapshot instance
+        backup              Backup instance
 
     optional arguments:
       -h, --help            show this help message and exit
