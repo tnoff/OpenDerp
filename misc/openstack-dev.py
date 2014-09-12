@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import argparse
+import boto
+from boto.s3 import connection as s3_connection
 from cinderclient.v1 import client as cinder_v1
 import code
 from novaclient.v1_1 import client as nova_v1
@@ -10,6 +12,7 @@ from neutronclient.v2_0 import client as neutron_v2
 import os
 import swiftclient
 import sys
+from urlparse import urlparse
 
 def parse_args():
     a = argparse.ArgumentParser(description='Give me the api clients')
@@ -69,6 +72,21 @@ def main():
         if 'image' == endpoint['type']:
             glance_ip = endpoint['endpoints'][0]['publicURL']
     glance = glance_client('1', endpoint=glance_ip, token=token)
+
+    creds = keystone.ec2.list(keystone.user_id)
+    if len(creds) == 0:
+        keystone.ec2.create(keystone.user_id, keystone.tenant_id)
+        creds = keystone.ec2.list(keystone.user_id)
+    cred = creds[-1]
+    s3_url = urlparse(keystone.service_catalog.url_for(service_type='object-store'))
+    host, port = s3_url.netloc.split(':')
+    s3 = boto.connect_s3(aws_access_key_id=cred.access,
+                         aws_secret_access_key=cred.secret,
+                         host=host,
+                         port=int(port),
+                         is_secure=False,
+                         calling_format=s3_connection.OrdinaryCallingFormat())
     code.interact(local=locals())
+
 if __name__ == '__main__':
     main()
