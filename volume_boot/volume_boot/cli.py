@@ -50,7 +50,8 @@ def parse_args():
     backup.add_argument('instance', help='ID of instance')
     backup.add_argument('--max', default=0, type=int,
                         help='Maximum number of backups')
-
+    backup.add_argument('--swift', action='store_true',
+                        help='Convert image to swift')
     return p.parse_args()
 
 def get_env_args(args):
@@ -85,7 +86,7 @@ def main():
     if args['command'] == 'snapshot':
         v.snapshot_instance(args['instance'], image_name=args['name'])
     if args['command'] == 'backup':
-        v.backup_instance(args['instance'], args['max'])
+        v.backup_instance(args['instance'], args['max'], swift=args['swift'])
 
 if __name__ == '__main__':
     main()

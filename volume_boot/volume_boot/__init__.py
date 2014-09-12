@@ -1,14 +1,22 @@
+import boto
+from boto.s3 import connection as s3_connection
+from boto.exception import S3ResponseError as s3_error
 from cinderclient.v1 import client as cinder_v1
 from contextlib import contextmanager
 from copy import deepcopy
+from datetime import datetime
 from glanceclient import Client as glance_client
 import json
 from keystoneclient.v2_0 import client as key_v2
 import logging
 from novaclient.v1_1 import client as nova_v1
+import os
 import random
 import string
+import tempfile
 import time
+from urlparse import urlparse
+
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +32,24 @@ class VolumeBoot(object):
         image_url = self.keystone.service_catalog.url_for(service_type='image')
         self.glance = glance_client('1', token=self.keystone.auth_token,
                                     endpoint=image_url)
+
+        self.s3 = self.__s3_client()
+
+    def __s3_client(self):
+        creds = self.keystone.ec2.list(self.keystone.user_id)
+        if len(creds) == 0:
+            self.keystone.ec2.create(self.keystone.user_id,
+                                     self.keystone.tenant_id)
+            creds = self.keystone.ec2.list(self.keystone.user_id)
+        cred = creds[-1]
+        s3_url = urlparse(self.keystone.service_catalog.url_for(service_type='object-store'))
+        host, port = s3_url.netloc.split(':')
+        return boto.connect_s3(aws_access_key_id=cred.access,
+                               aws_secret_access_key=cred.secret,
+                               host=host,
+                               port=int(port),
+                               is_secure=False,
+                               calling_format=s3_connection.OrdinaryCallingFormat())
 
     def __random_string(self, prefix='', length=10):
         chars = string.ascii_lowercase + string.digits
@@ -233,7 +259,55 @@ class VolumeBoot(object):
                 log.debug('Deleting backup:%s' % backup.id)
                 self.glance.images.delete(backup.id)
 
-    def backup_instance(self, instance_id, max_num):
+    def __convert_to_swift(self, image_id, bucket_name, key_name, metadata=None):
+        log.debug('Converting image:%s to swift object' % image_id)
+        with tempfile.NamedTemporaryFile() as f:
+            log.debug('Writing image to file:%s' % f.name)
+            with open(f.name, 'w+'):
+                for chunk in self.glance.images.data(image_id, do_checksum=False):
+                    f.write(chunk)
+            log.debug('Getting bucket:%s' % bucket_name)
+            try:
+                bucket = self.s3.get_bucket(bucket_name)
+                log.debug('Bucket exists')
+            except s3_error:
+                log.debug('Creating bucket:%s' % bucket_name)
+                bucket = self.s3.create_bucket(bucket_name)
+            log.debug('Getting key:%s' % key_name)
+            if bucket.get_key(key_name):
+                bucket.delete_key(key_name)
+            key = bucket.new_key(key_name=key_name)
+            log.debug('Have key:%s' % key_name)
+            log.debug('Setting contents from file:%s' % f.name)
+            with open(f.name, 'r') as f:
+                key.set_contents_from_file(f)
+            key.update_metadata(metadata)
+
+    def __delete_old_swift(self, max_num, bucket_name):
+        bucket = self.s3.get_bucket(bucket_name)
+        keys = bucket.get_all_keys()
+        num_backups = len(keys)
+        log.debug('Found %s backups, %s are allowed' % (num_backups, max_num))
+        if num_backups > max_num:
+            log.debug('Deleting old backups:%s' % keys)
+            delete_amount = num_backups - max_num
+            delete_backups = []
+            for backup in keys:
+                if len(delete_backups) < delete_amount:
+                    delete_backups.append(backup)
+                    continue
+                delete_index = None
+                for count, deleted in enumerate(delete_backups):
+                    if deleted.get_metadata('timestamp') > backup.get_metadata('timestamp'):
+                        delete_index = count
+                        break
+                if delete_index:
+                    delete_backups[delete_index] = backup
+            for backup in delete_backups:
+                log.debug('Deleting backup:%s' % backup)
+                bucket.delete_key(backup.name)
+
+    def backup_instance(self, instance_id, max_num, swift=True):
         # Check for number of backups
         instance_name = self.nova.servers.get(instance_id).name
         image_name = '%s-%s' % (instance_name, time.time())
@@ -241,5 +315,14 @@ class VolumeBoot(object):
         metadata = {'backup_instance_id' : instance_id, 'backup_timestamp' : time.time()}
         log.debug('Updating image metadata:%s' % metadata)
         self.glance.images.update(backup_image, properties=metadata)
-        if max_num:
+        if swift:
+            bucket_name = 'instance-%s-backups' % instance_id
+            key_name = 'backup-%s' % datetime.utcnow()
+            metadata = {'timestamp' : time.time()}
+            self.__convert_to_swift(backup_image, bucket_name, key_name,
+                                    metadata=metadata)
+            self.glance.images.delete(backup_image)
+            if max_num:
+                self.__delete_old_swift(max_num, bucket_name)
+        elif max_num:
             self.__delete_old_backups(instance_id, max_num)
