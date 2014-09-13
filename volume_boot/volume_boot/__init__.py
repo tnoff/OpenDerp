@@ -12,7 +12,9 @@ import logging
 from novaclient.v1_1 import client as nova_v1
 import os
 import random
+import shlex
 import string
+import subprocess
 import tempfile
 import time
 from urlparse import urlparse
@@ -259,13 +261,32 @@ class VolumeBoot(object):
                 log.debug('Deleting backup:%s' % backup.id)
                 self.glance.images.delete(backup.id)
 
-    def __convert_to_swift(self, image_id, bucket_name, key_name, metadata=None):
+    def __compress_file(self, file_name):
+        log.debug('Compressing file:%s' % file_name)
+        compress = '%s-compressed' % file_name
+        command = 'qemu-img convert -c -O qcow2 %s %s' % (file_name, compress)
+        log.debug('Command:%s' % command)
+        try:
+            proc = subprocess.Popen(shlex.split(command),
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,)
+            stdout_value = proc.communicate()
+        except OSError, e:
+            log.error('Cannot run compress command:%s' % str(e))
+        if stdout_value == ('', ''):
+            log.debug('Compression successful, renaming files')
+            os.remove(file_name)
+            os.rename(compress, file_name)
+
+    def __convert_to_swift(self, image_id, bucket_name, key_name, metadata=None, compress=False):
         log.debug('Converting image:%s to swift object' % image_id)
         with tempfile.NamedTemporaryFile() as f:
             log.debug('Writing image to file:%s' % f.name)
             with open(f.name, 'w+'):
                 for chunk in self.glance.images.data(image_id, do_checksum=False):
                     f.write(chunk)
+            if compress:
+                self.__compress_file(f.name)
             log.debug('Getting bucket:%s' % bucket_name)
             try:
                 bucket = self.s3.get_bucket(bucket_name)
@@ -307,10 +328,10 @@ class VolumeBoot(object):
                 log.debug('Deleting backup:%s' % backup)
                 bucket.delete_key(backup.name)
 
-    def backup_instance(self, instance_id, max_num, swift=True):
+    def backup_instance(self, instance_id, max_num, swift=True, compress=False):
         # Check for number of backups
         instance_name = self.nova.servers.get(instance_id).name
-        image_name = '%s-%s' % (instance_name, time.time())
+        image_name = '%s-%s' % (instance_name, datetime.utcnow())
         backup_image = self.snapshot_instance(instance_id, image_name=image_name)
         metadata = {'backup_instance_id' : instance_id, 'backup_timestamp' : time.time()}
         log.debug('Updating image metadata:%s' % metadata)
@@ -320,7 +341,7 @@ class VolumeBoot(object):
             key_name = 'backup-%s' % datetime.utcnow()
             metadata = {'timestamp' : time.time()}
             self.__convert_to_swift(backup_image, bucket_name, key_name,
-                                    metadata=metadata)
+                                    metadata=metadata, compress=compress)
             self.glance.images.delete(backup_image)
             if max_num:
                 self.__delete_old_swift(max_num, bucket_name)
