@@ -8,6 +8,7 @@ setuptools.setup(
     author_email='tylernorth18@gmail.com',
     description='OpenStack Bootable Volume',
     install_requires=[
+        'boto >= 2.32.0',
         'python-cinderclient >= 1.0.9',
         'python-glanceclient >= 0.13.1',
         'python-keystoneclient >= 0.10.1',
