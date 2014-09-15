@@ -52,6 +52,8 @@ def parse_args():
                         help='Maximum number of backups')
     backup.add_argument('--swift', action='store_true',
                         help='Convert image to swift')
+    backup.add_argument('--direct', action='store_true',
+                        help='Move directly from glance to swift')
     backup.add_argument('--compress', action='store_true',
                         help='Compress a swift object')
     return p.parse_args()
@@ -89,7 +91,8 @@ def main():
         v.snapshot_instance(args['instance'], image_name=args['name'])
     if args['command'] == 'backup':
         v.backup_instance(args['instance'], args['max'],
-                          swift=args['swift'], compress=args['compress'])
+                          swift=args['swift'], compress=args['compress'],
+                          direct=args['direct'])
 
 if __name__ == '__main__':
     main()

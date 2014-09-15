@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
 from glanceclient import Client as glance_client
+import io
 import json
 from keystoneclient.v2_0 import client as key_v2
 import logging
@@ -278,8 +279,8 @@ class VolumeBoot(object):
             os.remove(file_name)
             os.rename(compress, file_name)
 
-    def __convert_to_swift(self, image_id, bucket_name, key_name, metadata=None, compress=False):
-        log.debug('Converting image:%s to swift object' % image_id)
+    def __convert_via_file(self, image_id, bucket, key_name, metadata,
+                           compress=False):
         with tempfile.NamedTemporaryFile() as f:
             log.debug('Writing image to file:%s' % f.name)
             with open(f.name, 'w+'):
@@ -287,13 +288,6 @@ class VolumeBoot(object):
                     f.write(chunk)
             if compress:
                 self.__compress_file(f.name)
-            log.debug('Getting bucket:%s' % bucket_name)
-            try:
-                bucket = self.s3.get_bucket(bucket_name)
-                log.debug('Bucket exists')
-            except s3_error:
-                log.debug('Creating bucket:%s' % bucket_name)
-                bucket = self.s3.create_bucket(bucket_name)
             log.debug('Getting key:%s' % key_name)
             if bucket.get_key(key_name):
                 bucket.delete_key(key_name)
@@ -303,6 +297,51 @@ class VolumeBoot(object):
             with open(f.name, 'r') as f:
                 key.set_contents_from_file(f)
             key.update_metadata(metadata)
+
+    def __convert_directly(self, image_id, bucket, key_name, metadata):
+        if bucket.get_key(key_name):
+            bucket.delete_key(key_name)
+        estimated_size = self.glance.images.get(image_id).size * 1.0
+        log.debug('Estimated image size:%s' % estimated_size)
+        min_part_size = estimated_size / 1000
+        log.debug('Min part size:%s' % min_part_size)
+        multi_part = bucket.initiate_multipart_upload(key_name)
+        data = None
+        count = 0
+        log.debug('Uploading a 1000 parts')
+        for chunk in self.glance.images.data(image_id, do_checksum=False):
+            if not data:
+                data = chunk
+            else:
+                data += chunk
+            if len(data) >= min_part_size:
+                count += 1
+                f = io.BytesIO(data)
+                log.debug('Uploading part:%s' % count)
+                multi_part.upload_part_from_file(f, count)
+                f.close()
+                data = None
+        log.debug('Completing mutli part upload')
+        multi_part.complete_upload()
+        log.debug('Updating metadata')
+        key = bucket.get_key(key_name)
+        key.update_metadata(metadata)
+
+    def __convert_to_swift(self, image_id, bucket_name, key_name, metadata=None, compress=False, direct=False):
+        log.debug('Converting image:%s to swift object' % image_id)
+        log.debug('Getting bucket:%s' % bucket_name)
+        try:
+            bucket = self.s3.get_bucket(bucket_name)
+            log.debug('Bucket exists')
+        except s3_error:
+            log.debug('Creating bucket:%s' % bucket_name)
+            bucket = self.s3.create_bucket(bucket_name)
+        log.debug('Direct:%s' % direct)
+        if direct:
+            self.__convert_directly(image_id, bucket, key_name, metadata)
+        else:
+            self.__convert_via_file(image_id, bucket, key_name, metadata,
+                                    compress=compress)
 
     def __delete_old_swift(self, max_num, bucket_name):
         bucket = self.s3.get_bucket(bucket_name)
@@ -328,7 +367,8 @@ class VolumeBoot(object):
                 log.debug('Deleting backup:%s' % backup)
                 bucket.delete_key(backup.name)
 
-    def backup_instance(self, instance_id, max_num, swift=True, compress=False):
+    def backup_instance(self, instance_id, max_num, swift=True, compress=False,
+                        direct=False):
         # Check for number of backups
         instance_name = self.nova.servers.get(instance_id).name
         image_name = '%s-%s' % (instance_name, datetime.utcnow())
@@ -341,7 +381,8 @@ class VolumeBoot(object):
             key_name = 'backup-%s' % datetime.utcnow()
             metadata = {'timestamp' : time.time()}
             self.__convert_to_swift(backup_image, bucket_name, key_name,
-                                    metadata=metadata, compress=compress)
+                                    metadata=metadata, compress=compress,
+                                    direct=direct)
             self.glance.images.delete(backup_image)
             if max_num:
                 self.__delete_old_swift(max_num, bucket_name)
