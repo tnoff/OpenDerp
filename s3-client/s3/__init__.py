@@ -102,7 +102,7 @@ class S3Client(object):
             delete_bucket = True
         elif force:
             log.debug('Keys exist, but force specified, deleting keys first')
-            for key in key:
+            for key in keys:
                 log.debug('Deleting key:%s' % key.name)
                 try:
                     bucket.delete_key(key.name)
