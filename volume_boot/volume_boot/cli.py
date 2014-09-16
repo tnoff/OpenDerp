@@ -27,10 +27,10 @@ def parse_args():
 
     boot = subparsers.add_parser('boot',
                                  help='Create instance from bootable volume')
-    boot.add_argument('flavor', help='ID of flavor')
-    boot.add_argument('image', help='ID of image')
-    boot.add_argument('name', help='Name of new instance')
-    boot.add_argument('size', type=int, help='Size of volume')
+    boot.add_argument('--flavor', required=True,  help='ID of flavor')
+    boot.add_argument('--image', required=True, help='ID of image')
+    boot.add_argument('--name', required=True, help='Name of new instance')
+    boot.add_argument('--size', type=int, required=True, help='Size of volume')
     boot.add_argument('--key-name', help='Name of keypair to use')
     boot.add_argument('--no-temp', action='store_true',
                       help='Do not use keypair injection workaround')
