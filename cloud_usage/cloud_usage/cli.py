@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from cloud_usage import CloudUsage
+from cloud_usage.client import CloudUsage
 import argparse
 import os
 from prettytable import PrettyTable

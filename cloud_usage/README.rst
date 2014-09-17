@@ -75,5 +75,5 @@ Python Script
 
 .. code::
 
-    >>> from cloud_usage import CloudUsage
+    >>> from cloud_usage.client import CloudUsage
     >>> help(CloudUsage)
