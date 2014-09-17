@@ -43,5 +43,5 @@ Python Script
 
 .. code::
 
-    >>> from volume_boot import VolumeBoot
+    >>> from volume_boot.client import VolumeBoot
     >>> help(VolumeBoot)

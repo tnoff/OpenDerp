@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from volume_boot import VolumeBoot
+from volume_boot.client import VolumeBoot
 import argparse
 import logging
 import os
