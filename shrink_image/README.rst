@@ -41,5 +41,5 @@ Python Scripting
 
 .. code::
 
-    >>> from shrink_image import ShrinkImage
+    >>> from shrink_image.client import ShrinkImage
     >>> help(ShrinkImage)

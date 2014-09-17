@@ -3,7 +3,7 @@
 import argparse
 import logging
 import os
-from shrink_image import ShrinkImage
+from shrink_image.client import ShrinkImage
 import sys
 
 log_format = '%(asctime)s-%(levelname)s-%(message)s'
