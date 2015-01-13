@@ -61,6 +61,7 @@ class ShrinkImage(object):
         result = None
         image = self.glance.images.get(image_id)
         min_size = int(math.ceil(image.size / (1024*1024*1024.0)))
+        project_id = image.owner
         if image.disk_format == 'qcow2':
             log.error('Cannot shrink image, is already qcow2')
             return
@@ -77,11 +78,13 @@ class ShrinkImage(object):
                                                              'bare',
                                                              'qcow2')
             image_id = image_info[1]['os-volume_upload_image']['image_id']
-            log.debug('Image created:%s' % image_id)
-            result = self.__wait_for(image_id, self.glance.images.get,
-                                     ['active'], blacklist=['error'])
-            log.debug('Min size updated:%s' % min_size)
-            self.glance.images.update(image_id, min_disk=min_size)
+        log.debug('Image created:%s' % image_id)
+        result = self.__wait_for(image_id, self.glance.images.get,
+                                 ['active'], blacklist=['error'])
+        log.debug('Min size updated:%s' % min_size)
+        self.glance.images.update(image_id, min_disk=min_size)
+        log.debug('Updating owner to original project:%s' % project_id)
+        self.glance.images.update(image_id, owner=project_id)
         return result
 
     def shrink_all_images(self):
