@@ -20,6 +20,7 @@ def parse_args():
     a.add_argument('--password', help='Auth password')
     a.add_argument('--tenant-name', help='Auth tenant name')
     a.add_argument('--auth-url', help='Auth url')
+    a.add_argument('--ca-cert', help='Ca cert file')
     return a.parse_args()
 
 def get_env(args):
@@ -31,6 +32,8 @@ def get_env(args):
         args['tenant_name'] = os.getenv('OS_TENANT_NAME', None)
     if not args['auth_url']:
         args['auth_url'] = os.getenv('OS_AUTH_URL', None)
+    if not args['ca_cert']:
+        args['ca_cert'] = os.getenv('OS_CACERT')
     # Check for args
     must_have = ['username', 'password', 'tenant_name', 'auth_url']
     for item in must_have:
@@ -46,19 +49,23 @@ def main():
                           args['password'],
                           args['tenant_name'],
                           args['auth_url'],
-                          extensions=extensions)
+                          extensions=extensions,
+                          cacert=args['ca_cert'])
     keystone = key_v2.Client(username=args['username'],
                              password=args['password'],
                              tenant_name=args['tenant_name'],
-                             auth_url=args['auth_url'])
+                             auth_url=args['auth_url'],
+                             cacert=args['ca_cert'],)
     neutron = neutron_v2.Client(username=args['username'],
                                 password=args['password'],
                                 tenant_name=args['tenant_name'],
-                                auth_url=args['auth_url'])
+                                auth_url=args['auth_url'],
+                                cacert=args['ca_cert'],)
     cinder = cinder_v1.Client(args['username'],
                               args['password'],
                               args['tenant_name'],
-                              args['auth_url'])
+                              args['auth_url'],
+                              cacert=args['ca_cert'],)
     swift = swiftclient.client.Connection(auth_version='2',
                                           user=args['username'],
                                           key=args['password'],
