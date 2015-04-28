@@ -1,14 +1,15 @@
 from cinderclient.v1 import client as cinder_v1
-from contextlib import contextmanager
-from copy import deepcopy
 from glanceclient import Client as glance_client
 from keystoneclient.v2_0 import client as key_v2
 from keystoneclient.openstack.common.apiclient import exceptions as keystone_exceptions
 from neutronclient.v2_0 import client as neutron_v2
 from novaclient.v1_1 import client as nova_v1
+import swiftclient
+
+from contextlib import contextmanager
+from copy import deepcopy
 import random
 import string
-import swiftclient
 
 class CloudUsage(object):
     def __init__(self, username, password, tenant_name, auth_url):
@@ -39,7 +40,7 @@ class CloudUsage(object):
 
     def __get_member_role(self):
         for role in self.keystone.roles.list():
-            if '_member_' == role.name:
+            if role.name in ['_member_', 'member']:
                 return role
         return None
 
@@ -76,16 +77,16 @@ class CloudUsage(object):
         flavor_dict = dict()
         for flav in self.nova.flavors.list():
             args = vars(flav)
-            id = args.pop('id')
-            flavor_dict[id] = dict()
-            flavor_dict[id]['ram'] = int(args['ram'])
-            flavor_dict[id]['disk'] = int(args['disk'])
-            flavor_dict[id]['vcpus'] = int(args['vcpus'])
-            flavor_dict[id]['ephemeral'] = int(args['OS-FLV-EXT-DATA:ephemeral'])
+            flavor_id = args.pop('id')
+            flavor_dict[flavor_id] = dict()
+            flavor_dict[flavor_id]['ram'] = int(args['ram'])
+            flavor_dict[flavor_id]['disk'] = int(args['disk'])
+            flavor_dict[flavor_id]['vcpus'] = int(args['vcpus'])
+            flavor_dict[flavor_id]['ephemeral'] = int(args['OS-FLV-EXT-DATA:ephemeral'])
             try:
-                flavor_dict[id]['swap'] = int(args['swap'])
+                flavor_dict[flavor_id]['swap'] = int(args['swap'])
             except ValueError:
-                flavor_dict[id]['swap'] = 0
+                flavor_dict[flavor_id]['swap'] = 0
         return flavor_dict
 
     def nova_usage(self):
