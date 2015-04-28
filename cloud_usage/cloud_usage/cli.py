@@ -10,33 +10,33 @@ def parse_args():
     p = argparse.ArgumentParser(description='Create & Setup OpenStack Accounts')
     p.add_argument('--username', help='OpenStack Auth username')
     p.add_argument('--password', help='OpenStack Auth password')
-    p.add_argument('--tenant-name', help='OpenStack Auth tenant name')
-    p.add_argument('--auth-url', help='OpenStack Auth keystone url')
+    p.add_argument('--tenant_name', help='OpenStack Auth tenant name')
+    p.add_argument('--auth_url', help='OpenStack Auth keystone url')
     return p.parse_args()
 
 def get_env_args(args):
     # Check environment for variables if not set on command line
-    if not args['username']:
-        args['username'] = os.getenv('OS_USERNAME', None)
-    if not args['password']:
-        args['password'] = os.getenv('OS_PASSWORD', None)
-    if not args['tenant_name']:
-        args['tenant_name'] = os.getenv('OS_TENANT_NAME', None)
-    if not args['auth_url']:
-        args['auth_url'] = os.getenv('OS_AUTH_URL', None)
+    if not args.username:
+        args.username = os.getenv('OS_USERNAME')
+    if not args.password:
+        args.password = os.getenv('OS_PASSWORD')
+    if not args.tenant_name:
+        args.tenant_name = os.getenv('OS_TENANT_NAME')
+    if not args.auth_url:
+        args.auth_url = os.getenv('OS_AUTH_URL')
     must_have = ['username', 'password', 'tenant_name', 'auth_url']
     for item in must_have:
-        if args[item] == None:
+        if getattr(args, item) == None:
             sys.exit("Don't have:%s, exiting" % item)
     return args
 
 def main():
-    args = vars(parse_args())
-    args = get_env_args(args)
-    c = CloudUsage(args['username'], args['password'],
-                   args['tenant_name'], args['auth_url'])
+    args = get_env_args(parse_args())
+    c = CloudUsage(args.username, args.password,
+                   args.tenant_name, args.auth_url)
 
     data = c.cloud_usage()
+    print 'keys:', data.keys()
     show_keys = ['cinder', 'keystone', 'nova', 'swift', 'glance', 'neutron']
     for key in show_keys:
         print 'Moudle:%s' % key
