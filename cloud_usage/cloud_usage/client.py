@@ -14,6 +14,7 @@ import string
 CINDER_ARGS = ['gigabytes', 'volumes']
 NOVA_ARGS = ['ram', 'disk', 'vcpus', 'ephemeral', 'swap', 'instances']
 GLANCE_ARGS = ['bytes', 'images']
+SWIFT_ARGS = ['containers', 'bytes']
 
 class CloudUsage(object):
     def __init__(self, username, password, tenant_name, auth_url):
@@ -155,9 +156,15 @@ class CloudUsage(object):
         return image_dict
 
     def swift_usage(self):
+        # Build swift detault
+        swift_default = dict()
+        for i in SWIFT_ARGS:
+            swift_default[i] = 0
+        # Build with swift data
         swift_dict = dict()
-        swift_default = {'containers' : 0, 'bytes' : 0}
         swift_dict['total'] = deepcopy(swift_default)
+        # Swift is dumb and doesnt let admins query tenants directly
+        # To get around this, create temporary user to delete afterwards
         member = self.__get_member_role()
         username = self.__random_string(prefix='user-')
         password = self.__random_string()
@@ -170,6 +177,7 @@ class CloudUsage(object):
                                                       tenant_name=tenant.name,
                                                       authurl=self.os_auth_url)
                 info = swift.head_account()
+                # Add values from information
                 containers = int(info['x-account-container-count'])
                 bytes_used = int(info['x-account-bytes-used'])
                 if containers == 0 and bytes_used == 0:
