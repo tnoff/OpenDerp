@@ -12,6 +12,7 @@ import random
 import string
 
 CINDER_ARGS = ['gigabytes', 'volumes']
+NOVA_ARGS = ['ram', 'disk', 'vcpus', 'ephemeral', 'swap', 'instances']
 
 class CloudUsage(object):
     def __init__(self, username, password, tenant_name, auth_url):
@@ -81,36 +82,40 @@ class CloudUsage(object):
         return cinder_dict
 
     def __flavor_dict(self):
+        # Flavor dict to call ram, vcpus and cores values
         flavor_dict = dict()
         for flav in self.nova.flavors.list():
-            args = vars(flav)
-            flavor_id = args.pop('id')
-            flavor_dict[flavor_id] = dict()
-            flavor_dict[flavor_id]['ram'] = int(args['ram'])
-            flavor_dict[flavor_id]['disk'] = int(args['disk'])
-            flavor_dict[flavor_id]['vcpus'] = int(args['vcpus'])
-            flavor_dict[flavor_id]['ephemeral'] = int(args['OS-FLV-EXT-DATA:ephemeral'])
+            flavor_dict[flav.id] = dict()
+            flavor_dict[flav.id]['ram'] = int(flav.ram)
+            flavor_dict[flav.id]['disk'] = int(flav.disk)
+            flavor_dict[flav.id]['vcpus'] = int(flav.vcpus)
+            flavor_dict[flav.id]['ephemeral'] = getattr(flav, 'OS-FLV-EXT-DATA:ephemeral')
             try:
-                flavor_dict[flavor_id]['swap'] = int(args['swap'])
+                flavor_dict[flav.id]['swap'] = int(flav.swap)
             except ValueError:
-                flavor_dict[flavor_id]['swap'] = 0
+                flavor_dict[flav.id]['swap'] = 0
         return flavor_dict
 
     def nova_usage(self):
+        # Make sure you can get flavors first
         flavors = self.__flavor_dict()
+        # Set nova default dict
+        nova_default = dict()
+        for i in NOVA_ARGS:
+            nova_default[i] = 0
+        # Set up nova usage dict and totals
         nova_dict = dict()
-        nova_default = {'ram' : 0, 'disk' : 0, 'vcpus' : 0,
-                        'ephemeral' : 0, 'swap' : 0, 'instances' : 0,
-                       }
         nova_dict['total'] = deepcopy(nova_default)
         for server in self.nova.servers.list(search_opts={'all_tenants' : 1}):
-            args = vars(server)
-            tenant_id = args['tenant_id']
-            flav = flavors[args['flavor']['id']]
+            #args = vars(server)
+            tenant_id = server.tenant_id
+            flav = flavors[server.flavor['id']]
             nova_dict.setdefault(tenant_id, deepcopy(nova_default))
+            # For every value in flavors
             for key, value in flav.iteritems():
                 nova_dict[tenant_id][key] += value
                 nova_dict['total'][key] += value
+            # Also iterate instances
             nova_dict[tenant_id]['instances'] += 1
             nova_dict['total']['instances'] += 1
         return nova_dict
