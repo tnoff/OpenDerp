@@ -13,6 +13,7 @@ import string
 
 CINDER_ARGS = ['gigabytes', 'volumes']
 NOVA_ARGS = ['ram', 'disk', 'vcpus', 'ephemeral', 'swap', 'instances']
+GLANCE_ARGS = ['bytes', 'images']
 
 class CloudUsage(object):
     def __init__(self, username, password, tenant_name, auth_url):
@@ -128,22 +129,28 @@ class CloudUsage(object):
         return keystone_dict
 
     def glance_usage(self):
+        # Build default dict
+        image_default = dict()
+        for i in GLANCE_ARGS:
+            image_default[i] = 0
+        # Build image dict and totals
         image_dict = dict()
-        image_default = {'bytes' : 0, 'images' : 0}
         image_dict['total'] = deepcopy(image_default)
+        # For all private images
         for image in self.glance.images.list(is_public=False):
-            args = vars(image)
-            image_dict.setdefault(args['owner'], deepcopy(image_default))
-            image_dict[args['owner']]['bytes'] += args['size']
-            image_dict[args['owner']]['images'] += 1
-            image_dict['total']['bytes'] += args['size']
+            tenant_id = image.owner
+            image_dict.setdefault(tenant_id, deepcopy(image_default))
+            image_dict[tenant_id]['bytes'] += image.size
+            image_dict[tenant_id]['images'] += 1
+            image_dict['total']['bytes'] += image.size
             image_dict['total']['images'] += 1
+        # For all public images
         for image in self.glance.images.list(is_public=True):
-            args = vars(image)
-            image_dict.setdefault(args['owner'], deepcopy(image_default))
-            image_dict[args['owner']]['bytes'] += args['size']
-            image_dict[args['owner']]['images'] += 1
-            image_dict['total']['bytes'] += args['size']
+            tenant_id = image.owner
+            image_dict.setdefault(tenant_id, deepcopy(image_default))
+            image_dict[tenant_id]['bytes'] += image.size
+            image_dict[tenant_id]['images'] += 1
+            image_dict['total']['bytes'] += image.size
             image_dict['total']['images'] += 1
         return image_dict
 
