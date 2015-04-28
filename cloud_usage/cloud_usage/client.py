@@ -11,6 +11,8 @@ from copy import deepcopy
 import random
 import string
 
+CINDER_ARGS = ['gigabytes', 'volumes']
+
 class CloudUsage(object):
     def __init__(self, username, password, tenant_name, auth_url):
         self.os_auth_url = auth_url
@@ -59,19 +61,24 @@ class CloudUsage(object):
             self.keystone.users.delete(user.id)
 
     def cinder_usage(self):
-        volume_dict = dict()
-        volume_default = {'gigabytes' : 0, 'volumes' : 0}
-        volume_dict['total'] = deepcopy(volume_default)
+        # Generate default values for cinder args
+        cinder_default = dict()
+        for i in CINDER_ARGS:
+            cinder_default[i] = 0
+        # Cinder dict contains data for each tenant, and total
+        cinder_dict = dict()
+        cinder_dict['total'] = deepcopy(cinder_default)
+        # For each volume, add to values based on size and tenant id
         for volume in self.cinder.volumes.list(search_opts={'all_tenants' : 1}):
-            vol = vars(volume)
-            tenant_id = vol['os-vol-tenant-attr:tenant_id']
-            volume_dict.setdefault(tenant_id, deepcopy(volume_default))
-            volume_dict[tenant_id]['gigabytes'] += vol['size']
-            volume_dict[tenant_id]['volumes'] += 1
-
-            volume_dict['total']['gigabytes'] += vol['size']
-            volume_dict['total']['volumes'] += 1
-        return volume_dict
+            # Set for tenant
+            tenant_id = getattr(volume, 'os-vol-tenant-attr:tenant_id')
+            cinder_dict.setdefault(tenant_id, deepcopy(cinder_default))
+            cinder_dict[tenant_id]['gigabytes'] += volume.size
+            cinder_dict[tenant_id]['volumes'] += 1
+            # Set for totals
+            cinder_dict['total']['gigabytes'] += volume.size
+            cinder_dict['total']['volumes'] += 1
+        return cinder_dict
 
     def __flavor_dict(self):
         flavor_dict = dict()
