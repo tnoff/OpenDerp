@@ -125,8 +125,12 @@ class CloudUsage(object):
     def keystone_usage(self):
         keystone_dict = dict()
         keystone_dict['total'] = dict()
-        keystone_dict['total']['users'] = len(self.keystone.users.list())
-        keystone_dict['total']['projects'] = len(self.keystone.tenants.list())
+        try:
+            keystone_dict['total']['users'] = len(self.keystone.users.list())
+            keystone_dict['total']['projects'] = len(self.keystone.tenants.list())
+        except keystone_exceptions.Forbidden:
+            keystone_dict['total']['users'] = 'not allowed'
+            keystone_dict['total']['projects'] = 'not allowed'
         return keystone_dict
 
     def glance_usage(self):
@@ -210,9 +214,9 @@ class CloudUsage(object):
 
     def cloud_usage(self):
         usage = dict()
+        usage['keystone'] = self.keystone_usage()
         usage['cinder'] = self.cinder_usage()
         usage['nova'] = self.nova_usage()
-        usage['keystone'] = self.keystone_usage()
         usage['glance'] = self.glance_usage()
         usage['swift'] = self.swift_usage()
         usage['neutron'] = self.neutron_usage()
