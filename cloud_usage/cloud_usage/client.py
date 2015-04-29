@@ -120,7 +120,12 @@ class CloudUsage(object):
             log.debug('Adding server:%s to usage' % server.id)
             #args = vars(server)
             tenant_id = server.tenant_id
-            flav = flavors[server.flavor['id']]
+            try:
+                flav = flavors[server.flavor['id']]
+            except KeyError:
+                log.error('Cannot find flavor:%s for server:%s' % (server.flavor['id'],
+                                                                   server.id))
+                continue
             nova_dict.setdefault(tenant_id, deepcopy(nova_default))
             # For every value in flavors
             for key, value in flav.iteritems():
