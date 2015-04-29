@@ -1,10 +1,22 @@
 #!/usr/bin/env python
 
 from cloud_usage.client import CloudUsage
+
 import argparse
+import logging
 import os
 from prettytable import PrettyTable
 import sys
+
+
+log_format = '%(asctime)s-%(levelname)s-%(message)s'
+log = logging.getLogger('cloud_usage')
+log.setLevel(logging.DEBUG)
+handle = logging.StreamHandler()
+handle.setLevel(logging.ERROR)
+form = logging.Formatter(log_format)
+handle.setFormatter(form)
+log.addHandler(handle)
 
 def parse_args():
     p = argparse.ArgumentParser(description='Create & Setup OpenStack Accounts')
@@ -36,10 +48,8 @@ def main():
                    args.tenant_name, args.auth_url)
 
     data = c.cloud_usage()
-    print 'keys:', data.keys()
-    show_keys = ['cinder', 'keystone', 'nova', 'swift', 'glance', 'neutron']
+    show_keys = data.keys()
     for key in show_keys:
-        print 'Moudle:%s' % key
         raw_columns = data[key]['total'].keys()
         columns = ['tenant'] + raw_columns
         table = PrettyTable(columns)
