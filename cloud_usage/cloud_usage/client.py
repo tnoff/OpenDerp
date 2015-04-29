@@ -8,8 +8,11 @@ import swiftclient
 
 from contextlib import contextmanager
 from copy import deepcopy
+import logging
 import random
 import string
+
+log = logging.getLogger(__name__)
 
 CINDER_ARGS = ['gigabytes', 'volumes']
 NOVA_ARGS = ['ram', 'disk', 'vcpus', 'ephemeral', 'swap', 'instances']
@@ -64,6 +67,7 @@ class CloudUsage(object):
             self.keystone.users.delete(user.id)
 
     def cinder_usage(self):
+        log.debug('Loading cinder usage')
         # Generate default values for cinder args
         cinder_default = dict()
         for i in CINDER_ARGS:
@@ -73,6 +77,7 @@ class CloudUsage(object):
         cinder_dict['total'] = deepcopy(cinder_default)
         # For each volume, add to values based on size and tenant id
         for volume in self.cinder.volumes.list(search_opts={'all_tenants' : 1}):
+            log.debug('Adding volume:%s to usage' % volume.id)
             # Set for tenant
             tenant_id = getattr(volume, 'os-vol-tenant-attr:tenant_id')
             cinder_dict.setdefault(tenant_id, deepcopy(cinder_default))
@@ -85,8 +90,10 @@ class CloudUsage(object):
 
     def __flavor_dict(self):
         # Flavor dict to call ram, vcpus and cores values
+        log.debug('Loading flavor data')
         flavor_dict = dict()
         for flav in self.nova.flavors.list():
+            log.debug('Adding flavor:%s' % flav.id)
             flavor_dict[flav.id] = dict()
             flavor_dict[flav.id]['ram'] = int(flav.ram)
             flavor_dict[flav.id]['disk'] = int(flav.disk)
@@ -99,6 +106,7 @@ class CloudUsage(object):
         return flavor_dict
 
     def nova_usage(self):
+        log.debug('Loading nova data')
         # Make sure you can get flavors first
         flavors = self.__flavor_dict()
         # Set nova default dict
@@ -109,6 +117,7 @@ class CloudUsage(object):
         nova_dict = dict()
         nova_dict['total'] = deepcopy(nova_default)
         for server in self.nova.servers.list(search_opts={'all_tenants' : 1}):
+            log.debug('Adding server:%s to usage' % server.id)
             #args = vars(server)
             tenant_id = server.tenant_id
             flav = flavors[server.flavor['id']]
@@ -123,17 +132,20 @@ class CloudUsage(object):
         return nova_dict
 
     def keystone_usage(self):
+        log.debug('Loading keystone data')
         keystone_dict = dict()
         keystone_dict['total'] = dict()
         try:
             keystone_dict['total']['users'] = len(self.keystone.users.list())
             keystone_dict['total']['projects'] = len(self.keystone.tenants.list())
         except keystone_exceptions.Forbidden:
+            log.error('Not authorized to get keystone information')
             keystone_dict['total']['users'] = 'not allowed'
             keystone_dict['total']['projects'] = 'not allowed'
         return keystone_dict
 
     def glance_usage(self):
+        log.debug('Loading glance data')
         # Build default dict
         image_default = dict()
         for i in GLANCE_ARGS:
@@ -142,15 +154,22 @@ class CloudUsage(object):
         image_dict = dict()
         image_dict['total'] = deepcopy(image_default)
         # For all private images
+        # Keep list of images seen to double check for overlap
+        images_seen = []
         for image in self.glance.images.list(is_public=False):
+            log.debug('Adding image:%s to usage' % image.id)
             tenant_id = image.owner
             image_dict.setdefault(tenant_id, deepcopy(image_default))
             image_dict[tenant_id]['bytes'] += image.size
             image_dict[tenant_id]['images'] += 1
             image_dict['total']['bytes'] += image.size
             image_dict['total']['images'] += 1
+            images_seen.append(image.id)
         # For all public images
         for image in self.glance.images.list(is_public=True):
+            if image.id in images_seen:
+                continue
+            log.debug('Adding image:%s to usage' % image.id)
             tenant_id = image.owner
             image_dict.setdefault(tenant_id, deepcopy(image_default))
             image_dict[tenant_id]['bytes'] += image.size
@@ -160,6 +179,7 @@ class CloudUsage(object):
         return image_dict
 
     def swift_usage(self):
+        log.debug('Loading swift data')
         # Build swift detault
         swift_default = dict()
         for i in SWIFT_ARGS:
@@ -174,6 +194,7 @@ class CloudUsage(object):
         password = self.__random_string()
         with self.temp_user(username, password) as user:
             for tenant in self.keystone.tenants.list():
+                log.debug('Gathering data for tenant:%s' % tenant.id)
                 tenant.add_user(user.id, member.id)
                 swift = swiftclient.client.Connection(auth_version='2',
                                                       user=username,
@@ -194,15 +215,18 @@ class CloudUsage(object):
         return swift_dict
 
     def neutron_usage(self):
+        log.debug('Loading neutron usage')
         usage = dict()
         default = {'networks' : 0, 'shared_networks' : 0}
         usage['total'] = deepcopy(default)
         try:
             networks = self.neutron.list_networks()['networks']
         except keystone_exceptions.EndpointNotFound:
+            log.error('No neutron endpoint found')
             usage['total']['Endpoint'] = 'URL not found'
             return usage
         for net in networks:
+            log.debug('Adding network:%s to usage' % net)
             tenant = self.__get_tenant(net['tenant_id'])
             usage.setdefault(tenant.id, deepcopy(default))
             usage[tenant.id]['networks'] += 1
