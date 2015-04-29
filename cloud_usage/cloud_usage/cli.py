@@ -50,6 +50,7 @@ def main():
     data = c.cloud_usage()
     show_keys = data.keys()
     for key in show_keys:
+        print 'Module --', key
         raw_columns = data[key]['total'].keys()
         columns = ['tenant'] + raw_columns
         table = PrettyTable(columns)
