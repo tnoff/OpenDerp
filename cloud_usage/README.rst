@@ -1,10 +1,11 @@
+###########
 Cloud Usage
-============
+###########
+Get a summary of resources being used  on an OpenStack Cluster.
 
-Get a summary of used resources on an OpenStack Cluster
-
+=======
 Install
---------
+=======
 
 .. code::
 
@@ -12,9 +13,9 @@ Install
     cd OpenDerp/
     pip install cloud_usage/
 
+============
 Command Line
--------------
-
+============
 .. code::
 
     $ cloud-usage --help
@@ -31,8 +32,9 @@ Command Line
                             OpenStack Auth tenant name
       --auth-url AUTH_URL   OpenStack Auth keystone url
 
+==========
 Sample Run
------------
+==========
 
 .. code::
 
@@ -70,8 +72,9 @@ Sample Run
     | 724a9104d7aa46b6aaf101895c63b385 |   3    | 22790472192 |
     +----------------------------------+--------+-------------+
 
+=============
 Python Script
---------------
+=============
 
 .. code::
 
