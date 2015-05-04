@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import setuptools
 
-VERSION = '2.1'
+VERSION = '0.1'
 
 setuptools.setup(
     author='Tyler Daniel North',
@@ -13,10 +13,10 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts' : [
-            's3-client = s3.client:main',
+            'boyo = boyo.cli:main',
         ]
     },
     packages=setuptools.find_packages(),
-    name='s3-client',
+    name='boyo',
     version=VERSION,
 )

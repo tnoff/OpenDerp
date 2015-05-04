@@ -5,12 +5,11 @@ from boto.exception import S3ResponseError as s3_error
 from keystoneclient.v2_0 import client as key_v2
 import logging
 import os
-import sys
 from urlparse import urlparse
 
 log = logging.getLogger(__name__)
 
-class S3Client(object):
+class BoyoClient(object):
     def __init__(self, username, password, tenant_name, auth_url):
         keystone = key_v2.Client(username=username,
                                  password=password,

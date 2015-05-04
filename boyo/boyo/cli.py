@@ -2,7 +2,7 @@
 import argparse
 import os
 from prettytable import PrettyTable
-from s3.client import S3Client
+from boyo.client import BoyoClient
 import sys
 
 def parse_args():
@@ -53,7 +53,7 @@ def get_env(args):
 def main():
     args = vars(parse_args())
     args = get_env(args)
-    conn = S3Client(args['username'], args['password'], args['tenant_name'],
+    conn = BoyoClient(args['username'], args['password'], args['tenant_name'],
                     args['auth_url'])
 
     if args['command'] == 'list':
@@ -90,6 +90,3 @@ def main():
                           file_name=args['file'],)
         if result:
             print result
-
-if __name__ == '__main__':
-    main()
