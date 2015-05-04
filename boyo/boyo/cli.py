@@ -2,8 +2,9 @@
 import argparse
 import os
 from prettytable import PrettyTable
-from boyo.client import BoyoClient
 import sys
+
+from boyo.client import BoyoClient
 
 def parse_args():
     p = argparse.ArgumentParser(description='S3 Command Line Tool For OpenStack')

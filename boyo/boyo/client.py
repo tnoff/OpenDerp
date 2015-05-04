@@ -3,6 +3,7 @@ import boto
 from boto.s3 import connection as s3_connection
 from boto.exception import S3ResponseError as s3_error
 from keystoneclient.v2_0 import client as key_v2
+
 import logging
 import os
 from urlparse import urlparse
