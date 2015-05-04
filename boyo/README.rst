@@ -1,22 +1,23 @@
-S3 Command Line Client
-=====================
-
+###############################
+S3 Command Line Client, or Boyo
+###############################
 Connect to OpenStack using the s3 python boto module
 
+=======
 Install
--------
+=======
 
 .. code::
 
     $ git clone https://github.com/tylernorth/OpenDerp.git
     $ cd OpenDerp
-    $ pip install s3-client/
+    $ pip install boyo/
 
-Command Use
--------------
-
+============
+Command Line
+============
 .. code::
 
-    $ s3-client --help
+    $ boyo --help
     # List all buckets/containers
-    $ s3-client list
+    $ boyo list

@@ -30,7 +30,7 @@ def parse_args():
 
     command_get = subparsers.add_parser('get', help='Get key')
     command_get.add_argument('bucket', help='Bucket name')
-    command_get.add_argument('key', help='Key name')
+    command_get.add_argument('key', nargs='?', help='Key name')
     command_get.add_argument('--file', help='File to save to')
 
     return p.parse_args()
@@ -67,7 +67,7 @@ def main():
         obj = conn.create(args.bucket,
                           key_name=args.key,
                           file_name=args.file,
-                          stringy=args.string,)
+                          string_contents=args.string,)
         print obj.name
 
     if args.command == 'delete':
@@ -81,7 +81,7 @@ def main():
 
     if args.command == 'get':
         result = conn.get(args.bucket,
-                          args.key,
+                          key_name=args.key,
                           file_name=args.file,)
         if result:
             print result
