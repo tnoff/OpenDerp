@@ -2,7 +2,6 @@
 import argparse
 import os
 from prettytable import PrettyTable
-import sys
 
 from boyo.client import BoyoClient
 
@@ -10,8 +9,8 @@ def parse_args():
     p = argparse.ArgumentParser(description='S3 Command Line Tool For OpenStack')
     p.add_argument('--username', help='OpenStack Auth username')
     p.add_argument('--password', help='OpenStack Auth password')
-    p.add_argument('--tenant-name', help='OpenStack Auth tenant name')
-    p.add_argument('--auth-url', help='OpenStack Auth url')
+    p.add_argument('--tenant_name', help='OpenStack Auth tenant name')
+    p.add_argument('--auth_url', help='OpenStack Auth url')
 
     subparsers = p.add_subparsers(help='Command', dest='command')
 
@@ -37,28 +36,23 @@ def parse_args():
     return p.parse_args()
 
 def get_env(args):
-    if args['username'] == None and 'OS_USERNAME' in os.environ.keys():
-        args['username'] = os.environ['OS_USERNAME']
-    if args['password'] == None and 'OS_PASSWORD' in os.environ.keys():
-        args['password'] = os.environ['OS_PASSWORD']
-    if args['tenant_name'] == None and 'OS_TENANT_NAME' in os.environ.keys():
-        args['tenant_name'] = os.environ['OS_TENANT_NAME']
-    if args['auth_url'] == None and 'OS_AUTH_URL' in os.environ.keys():
-        args['auth_url'] = os.environ['OS_AUTH_URL']
-    must_have = ['username', 'password', 'tenant_name', 'auth_url']
-    for item in must_have:
-        if args[item] == None:
-            sys.exit("Don't have:%s, exiting" % item)
+    if not args.username:
+        args.username = os.getenv('OS_USERNAME')
+    if not args.password:
+        args.password = os.getenv('OS_PASSWORD')
+    if not args.tenant_name:
+        args.tenant_name = os.getenv('OS_TENANT_NAME')
+    if not args.auth_url:
+        args.auth_url = os.getenv('OS_AUTH_URL')
     return args
 
 def main():
-    args = vars(parse_args())
-    args = get_env(args)
-    conn = BoyoClient(args['username'], args['password'], args['tenant_name'],
-                    args['auth_url'])
+    args = get_env(parse_args())
+    conn = BoyoClient(args.username, args.password,
+                      args.tenant_name, args.auth_url)
 
-    if args['command'] == 'list':
-        buckets = conn.list(bucket_name=args['bucket'],)
+    if args.command == 'list':
+        buckets = conn.list(bucket_name=args.bucket,)
         if not buckets:
             print 'Result not found'
             return
@@ -69,25 +63,25 @@ def main():
                 table.add_row([key.name, key.size])
             print table
 
-    if args['command'] == 'create':
-        obj = conn.create(args['bucket'],
-                          key_name=args['key'],
-                          file_name=args['file'],
-                          stringy=args['string'],)
+    if args.command == 'create':
+        obj = conn.create(args.bucket,
+                          key_name=args.key,
+                          file_name=args.file,
+                          stringy=args.string,)
         print obj.name
 
-    if args['command'] == 'delete':
-        result = conn.delete(args['bucket'],
-                             key_name=args['key'],
-                             force=args['force'],)
+    if args.command == 'delete':
+        result = conn.delete(args.bucket,
+                             key_name=args.key,
+                             force=args.force,)
         if result:
             print 'Deleted'
         else:
             print 'Not deleted'
 
-    if args['command'] == 'get':
-        result = conn.get(args['bucket'],
-                          args['key'],
-                          file_name=args['file'],)
+    if args.command == 'get':
+        result = conn.get(args.bucket,
+                          args.key,
+                          file_name=args.file,)
         if result:
             print result
