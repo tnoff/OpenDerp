@@ -13,7 +13,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts' : [
-            'boyo = boyo.cli:main',
+            'boyo = boyo.command_line:main',
         ]
     },
     packages=setuptools.find_packages(),
