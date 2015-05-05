@@ -21,3 +21,14 @@ Command Line
     $ boyo --help
     # List all buckets/containers
     $ boyo list
+
+=============
+Python Script
+=============
+.. code::
+
+    python
+    >>> from boyo.client import BoyoClient
+    >>> c = BoyoClient(username, password, tenant_name, auth_url)
+    >>> c.boto
+    S3Connection:192.168.2.9
