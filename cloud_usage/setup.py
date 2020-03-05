@@ -5,7 +5,7 @@ VERSION = '0.7'
 
 setuptools.setup(
     author='Tyler Daniel North',
-    author_email='tylernorth18@gmail.com',
+    author_email='ty_north@yahoo.com',
     description='OpenStack Cloud Usage Script',
     install_requires=[
         'python-cinderclient >= 1.0.9',

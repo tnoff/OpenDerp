@@ -5,7 +5,7 @@ VERSION = '0.2'
 
 setuptools.setup(
     author='Tyler Daniel North',
-    author_email='tylernorth18@gmail.com',
+    author_email='ty_north@yahoo.com',
     description='Command Line Client For S3 Client Against OpenStack Swift',
     install_requires=[
         'python-keystoneclient >= 0.9.0',

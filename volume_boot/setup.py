@@ -5,7 +5,7 @@ VERSION = '0.9'
 
 setuptools.setup(
     author='Tyler Daniel North',
-    author_email='tylernorth18@gmail.com',
+    author_email='ty_north@yahoo.com',
     description='OpenStack Bootable Volume',
     install_requires=[
         'boto >= 2.32.0',

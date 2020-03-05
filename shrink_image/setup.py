@@ -5,7 +5,7 @@ VERSION = '0.4'
 
 setuptools.setup(
     author='Tyler Daniel North',
-    author_email='tylernorth18@gmail.com',
+    author_email='ty_north@yahoo.com',
     description='OpenStack Shrink Images',
     install_requires=[
         'python-cinderclient >= 1.0.9',
